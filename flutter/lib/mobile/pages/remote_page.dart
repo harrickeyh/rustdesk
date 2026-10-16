@@ -7,6 +7,7 @@ import 'package:flutter_hbb/common/widgets/toolbar.dart';
 import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/mobile/widgets/floating_mouse.dart';
 import 'package:flutter_hbb/mobile/widgets/floating_mouse_widgets.dart';
+import 'package:flutter_hbb/mobile/widgets/game_keys_pad.dart';
 import 'package:flutter_hbb/mobile/widgets/gesture_help.dart';
 import 'package:flutter_hbb/models/chat_model.dart';
 import 'package:flutter_keyboard_visibility/flutter_keyboard_visibility.dart';
@@ -74,6 +75,7 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
   final FocusNode _mobileFocusNode = FocusNode();
   final FocusNode _physicalFocusNode = FocusNode();
   var _showEdit = false; // use soft keyboard
+  var _showGameKeys = false;
 
   Worker? _waylandKeyboardGateWorker;
   bool _waylandKeyboardGateInitialized = false;
@@ -598,6 +600,13 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
                                   icon: Icon(Icons.keyboard),
                                   onPressed: openKeyboard),
                               IconButton(
+                                  color: _showGameKeys
+                                      ? Colors.lightBlueAccent
+                                      : Colors.white,
+                                  icon: Icon(Icons.sports_esports),
+                                  onPressed: () => setState(
+                                      () => _showGameKeys = !_showGameKeys)),
+                              IconButton(
                                 color: Colors.white,
                                 icon: Icon(gFFI.ffiModel.touchMode
                                     ? Icons.touch_app
@@ -711,6 +720,15 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
             paints.add(FloatingMouseWidgets(
               ffi: gFFI,
             ));
+          }
+          if (_showGameKeys &&
+              gFFI.ffiModel.keyboard &&
+              !gFFI.ffiModel.viewOnly) {
+            paints.add(Positioned.fill(
+                child: GameKeysPad(
+              ffi: gFFI,
+              onClose: () => setState(() => _showGameKeys = false),
+            )));
           }
           return paints;
         }()));
@@ -920,7 +938,8 @@ class KeyHelpTools extends StatefulWidget {
   final bool showGestureHelp;
 
   /// need to show by external request, etc [keyboardIsVisible] or [changeTouchMode]
-  bool get requestShow => keyboardIsVisible || showGestureHelp;
+  // The soft keyboard no longer pulls up this bar; use the game keys pad instead.
+  bool get requestShow => showGestureHelp;
 
   KeyHelpTools(
       {required this.keyboardIsVisible, required this.showGestureHelp});
