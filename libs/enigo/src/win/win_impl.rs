@@ -60,7 +60,9 @@ fn keybd_event(mut flags: u32, vk: u16, scan: u16) -> DWORD {
                     GetWindowThreadProcessId(GetForegroundWindow(), std::ptr::null_mut());
                 LAYOUT = GetKeyboardLayout(current_window_thread_id);
             }
-            scan = MapVirtualKeyExW(vk as _, 0, LAYOUT) as _;
+            // MAPVK_VK_TO_VSC_EX keeps the 0xE0 prefix, so arrows/Home/etc. are sent as
+            // extended keys instead of their numpad twins.
+            scan = MapVirtualKeyExW(vk as _, 4, LAYOUT) as _;
         }
     }
 

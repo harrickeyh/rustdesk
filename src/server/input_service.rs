@@ -217,12 +217,6 @@ impl LockModesHandler {
             let local_num_enabled = en.get_key_state(enigo::Key::NumLock);
             event_num_enabled = Self::is_modifier_enabled(key_event, ControlKey::NumLock);
             num_lock_changed = event_num_enabled != local_num_enabled;
-        } else if is_legacy_mode(key_event) {
-            #[cfg(target_os = "windows")]
-            {
-                num_lock_changed =
-                    should_disable_numlock(key_event) && en.get_key_state(enigo::Key::NumLock);
-            }
         }
         if num_lock_changed {
             en.key_click(enigo::Key::NumLock);
@@ -281,20 +275,6 @@ impl Drop for LockModesHandler {
             en.key_click(enigo::Key::NumLock);
         }
     }
-}
-
-#[inline]
-#[cfg(target_os = "windows")]
-fn should_disable_numlock(evt: &KeyEvent) -> bool {
-    // disable numlock if press home etc when numlock is on,
-    // because we will get numpad value (7,8,9 etc) if not
-    match (&evt.union, evt.mode.enum_value_or(KeyboardMode::Legacy)) {
-        (Some(key_event::Union::ControlKey(ck)), KeyboardMode::Legacy) => {
-            return NUMPAD_KEY_MAP.contains_key(&ck.value());
-        }
-        _ => {}
-    }
-    false
 }
 
 pub const NAME_CURSOR: &'static str = "mouse_cursor";
@@ -1867,7 +1847,13 @@ fn process_chr(en: &mut Enigo, chr: u32, down: bool, _hotkey: bool) {
         }
     }
 
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(target_os = "windows")]
+    if !_hotkey {
+        process_chr_windows(en, chr, down);
+        return;
+    }
+
+    #[cfg(target_os = "macos")]
     if !_hotkey {
         if down {
             if let Ok(chr) = char::try_from(chr) {
@@ -1892,6 +1878,22 @@ fn process_chr(en: &mut Enigo, chr: u32, down: bool, _hotkey: bool) {
         }
     } else {
         en.key_up(key);
+    }
+}
+
+// Games and other raw-input readers ignore VK_PACKET text, so send a real key press
+// when the current layout can type the char, and fall back to text injection otherwise.
+#[cfg(target_os = "windows")]
+fn process_chr_windows(en: &mut Enigo, chr: u32, down: bool) {
+    let Ok(c) = char::try_from(chr) else {
+        return;
+    };
+    if down {
+        if en.key_down(Key::Layout(c)).is_err() {
+            en.key_sequence(&c.to_string());
+        }
+    } else {
+        en.key_up(Key::Layout(c));
     }
 }
 
@@ -2702,19 +2704,6 @@ lazy_static::lazy_static! {
         (ControlKey::RAlt, Key::RightAlt),
         (ControlKey::RControl, Key::RightControl),
         (ControlKey::RShift, Key::RightShift),
-    ].iter().map(|(a, b)| (a.value(), b.clone())).collect();
-    static ref NUMPAD_KEY_MAP: HashMap<i32, bool> =
-    [
-        (ControlKey::Home, true),
-        (ControlKey::UpArrow, true),
-        (ControlKey::PageUp, true),
-        (ControlKey::LeftArrow, true),
-        (ControlKey::RightArrow, true),
-        (ControlKey::End, true),
-        (ControlKey::DownArrow, true),
-        (ControlKey::PageDown, true),
-        (ControlKey::Insert, true),
-        (ControlKey::Delete, true),
     ].iter().map(|(a, b)| (a.value(), b.clone())).collect();
 }
 
