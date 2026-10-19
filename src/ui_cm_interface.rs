@@ -267,6 +267,8 @@ impl<T: InvokeUiCM> ConnectionManager<T> {
             .unwrap()
             .retain(|_, c| !(c.disconnected && c.peer_id == client.peer_id));
         CLIENTS.write().unwrap().insert(id, client.clone());
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
+        crate::conn_log::on_add(id, &client.peer_id, &client.name, client.authorized);
         self.ui_handler.add_connection(&client);
     }
 
@@ -282,6 +284,15 @@ impl<T: InvokeUiCM> ConnectionManager<T> {
     }
 
     fn remove_connection(&self, id: i32, close: bool) {
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
+        crate::conn_log::on_remove(
+            id,
+            CLIENTS
+                .read()
+                .unwrap()
+                .get(&id)
+                .map_or(false, |c| c.authorized),
+        );
         if close {
             CLIENTS.write().unwrap().remove(&id);
         } else {
@@ -369,6 +380,8 @@ pub fn authorize(id: i32) {
         client.authorized = true;
         allow_err!(client.tx.send(Data::Authorize));
     };
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    crate::conn_log::on_authorized(id);
 }
 
 #[inline]

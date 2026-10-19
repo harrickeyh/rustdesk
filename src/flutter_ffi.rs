@@ -1121,6 +1121,18 @@ pub fn main_get_app_name() -> String {
     get_app_name()
 }
 
+pub fn main_get_conn_log() -> String {
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    return crate::conn_log::get_json();
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    return "[]".to_owned();
+}
+
+pub fn main_clear_conn_log() {
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    crate::conn_log::clear();
+}
+
 pub fn main_get_app_name_sync() -> SyncReturn<String> {
     SyncReturn(get_app_name())
 }

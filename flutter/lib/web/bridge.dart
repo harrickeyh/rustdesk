@@ -868,6 +868,14 @@ class RustdeskImpl {
     return Future.value(mainGetAppNameSync(hint: hint));
   }
 
+  Future<String> mainGetConnLog({dynamic hint}) {
+    return Future.value('[]');
+  }
+
+  Future<void> mainClearConnLog({dynamic hint}) {
+    return Future.value();
+  }
+
   String mainGetAppNameSync({dynamic hint}) {
     return js.context.callMethod('getByName', ['app-name']);
   }

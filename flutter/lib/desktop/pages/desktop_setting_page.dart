@@ -55,6 +55,7 @@ enum SettingsTabKey {
   display,
   account,
   printer,
+  connLog,
   about,
 }
 
@@ -77,6 +78,7 @@ class DesktopSettingPage extends StatefulWidget {
         !bind.isDisableSettings() &&
         bind.mainGetBuildinOption(key: kOptionHideRemotePrinterSetting) != 'Y')
       SettingsTabKey.printer,
+    if (!isWeb && !bind.isOutgoingOnly()) SettingsTabKey.connLog,
     SettingsTabKey.about,
   ];
 
@@ -208,6 +210,10 @@ class _DesktopSettingPageState extends State<DesktopSettingPage>
           settingTabs
               .add(_TabInfo(tab, 'Printer', Icons.print_outlined, Icons.print));
           break;
+        case SettingsTabKey.connLog:
+          settingTabs.add(_TabInfo(
+              tab, 'Connection log', Icons.history_outlined, Icons.history));
+          break;
         case SettingsTabKey.about:
           settingTabs
               .add(_TabInfo(tab, 'About', Icons.info_outline, Icons.info));
@@ -238,6 +244,9 @@ class _DesktopSettingPageState extends State<DesktopSettingPage>
           break;
         case SettingsTabKey.printer:
           children.add(const _Printer());
+          break;
+        case SettingsTabKey.connLog:
+          children.add(const _ConnLog());
           break;
         case SettingsTabKey.about:
           children.add(const _About());
@@ -2496,6 +2505,121 @@ class __PrinterState extends State<_Printer> {
         enabled: printerOptions.action != kValuePrinterIncomingJobDismiss,
       )
     ]);
+  }
+}
+
+class _ConnLog extends StatefulWidget {
+  const _ConnLog({Key? key}) : super(key: key);
+
+  @override
+  State<_ConnLog> createState() => _ConnLogState();
+}
+
+class _ConnLogState extends State<_ConnLog> {
+  late Future<List<Map<String, dynamic>>> _entries = _load();
+
+  Future<List<Map<String, dynamic>>> _load() async {
+    try {
+      final list = jsonDecode(await bind.mainGetConnLog()) as List<dynamic>;
+      return list.cast<Map<String, dynamic>>();
+    } catch (e) {
+      debugPrint('failed to load connection log: $e');
+      return [];
+    }
+  }
+
+  void _refresh() => setState(() => _entries = _load());
+
+  static String _two(int v) => v.toString().padLeft(2, '0');
+
+  static String _formatTime(int secs) {
+    final t = DateTime.fromMillisecondsSinceEpoch(secs * 1000);
+    return '${t.year}-${_two(t.month)}-${_two(t.day)} '
+        '${_two(t.hour)}:${_two(t.minute)}:${_two(t.second)}';
+  }
+
+  static String _formatDuration(int secs) {
+    if (secs < 0) secs = 0;
+    final h = secs ~/ 3600;
+    final m = (secs % 3600) ~/ 60;
+    final s = secs % 60;
+    if (h > 0) return '${h}h ${_two(m)}m ${_two(s)}s';
+    if (m > 0) return '${m}m ${_two(s)}s';
+    return '${s}s';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scrollController = ScrollController();
+    return SingleChildScrollView(
+      controller: scrollController,
+      child: _Card(title: 'Connection log', children: [
+        Row(children: [
+          TextButton.icon(
+            onPressed: _refresh,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Refresh'),
+          ),
+          TextButton.icon(
+            onPressed: () async {
+              await bind.mainClearConnLog();
+              _refresh();
+            },
+            icon: const Icon(Icons.delete_outline),
+            label: const Text('Clear'),
+          ),
+        ]),
+        FutureBuilder<List<Map<String, dynamic>>>(
+          future: _entries,
+          builder: (context, snapshot) {
+            final entries = snapshot.data;
+            if (entries == null) {
+              return const Padding(
+                padding: EdgeInsets.all(16),
+                child: Center(child: CircularProgressIndicator()),
+              );
+            }
+            if (entries.isEmpty) {
+              return const Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: Text('No sessions yet.'),
+              );
+            }
+            return SelectionArea(
+              child: Table(
+                columnWidths: const {
+                  0: FlexColumnWidth(3),
+                  1: FlexColumnWidth(3),
+                  2: FlexColumnWidth(2),
+                },
+                children: [
+                  const TableRow(children: [
+                    Text('Who', style: TextStyle(fontWeight: FontWeight.bold)),
+                    Text('Started',
+                        style: TextStyle(fontWeight: FontWeight.bold)),
+                    Text('Duration',
+                        style: TextStyle(fontWeight: FontWeight.bold)),
+                  ]),
+                  for (final e in entries)
+                    TableRow(children: [
+                      Text((e['name'] ?? '').toString().isEmpty
+                              ? '${e['peer_id']}'
+                              : '${e['name']} (${e['peer_id']})')
+                          .marginSymmetric(vertical: 4.0),
+                      Text(_formatTime((e['start'] as num).toInt()))
+                          .marginSymmetric(vertical: 4.0),
+                      Text(_formatDuration(
+                              (e['end'] as num).toInt() -
+                                  (e['start'] as num).toInt()))
+                          .marginSymmetric(vertical: 4.0),
+                    ]),
+                ],
+              ),
+            );
+          },
+        ),
+      ]),
+    );
   }
 }
 
