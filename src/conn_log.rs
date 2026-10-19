@@ -14,8 +14,7 @@ use std::{
 };
 
 const FILE_NAME: &str = "conn_log.jsonl";
-const MAX_FILE_BYTES: u64 = 512 * 1024;
-const MAX_ENTRIES_RETURNED: usize = 500;
+const MAX_ENTRIES: usize = 1000;
 
 #[derive(Serialize, Deserialize)]
 struct Entry {
@@ -92,10 +91,10 @@ pub fn on_remove(conn_id: i32, was_authorized: bool) {
 
 fn append(entry: &Entry) -> std::io::Result<()> {
     let path = path();
-    if fs::metadata(&path).map(|m| m.len() > MAX_FILE_BYTES).unwrap_or(false) {
-        let text = fs::read_to_string(&path)?;
-        let lines: Vec<&str> = text.lines().collect();
-        let keep = lines[lines.len() / 2..].join("\n");
+    let text = fs::read_to_string(&path).unwrap_or_default();
+    let lines: Vec<&str> = text.lines().collect();
+    if lines.len() >= MAX_ENTRIES {
+        let keep = lines[lines.len() + 1 - MAX_ENTRIES..].join("\n");
         fs::write(&path, keep + "\n")?;
     }
     let mut f = OpenOptions::new().create(true).append(true).open(&path)?;
@@ -110,7 +109,7 @@ pub fn get_json() -> String {
         .lines()
         .rev()
         .filter_map(|l| serde_json::from_str(l).ok())
-        .take(MAX_ENTRIES_RETURNED)
+        .take(MAX_ENTRIES)
         .collect();
     serde_json::to_string(&entries).unwrap_or_else(|_| "[]".to_owned())
 }
