@@ -14,7 +14,7 @@ use std::{
 };
 
 const FILE_NAME: &str = "conn_log.jsonl";
-const MAX_ENTRIES: usize = 1000;
+const MAX_ENTRIES: usize = 10000;
 
 #[derive(Serialize, Deserialize)]
 struct Entry {
